@@ -1,0 +1,9 @@
+CREATE TABLE accounts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    account_number VARCHAR(20) UNIQUE NOT NULL,
+    account_type VARCHAR(20) CHECK (account_type IN ('SAVINGS', 'CURRENT')),
+    balance DECIMAL(15,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
