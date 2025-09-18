@@ -47,6 +47,9 @@ public class Transaction {
     @NotNull(message = "Transaction status is required")
     private TransactionStatus status;
     
+    @Column(name = "transaction_ref", length = 50, unique = true)
+    private String transactionRef;
+    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

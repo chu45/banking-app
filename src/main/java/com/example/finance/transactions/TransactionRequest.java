@@ -5,8 +5,9 @@ import lombok.Data;
 
 @Data
 public class TransactionRequest {
-    private Long sourceAccountId;
-    private Long destinationAccountId;
+    private String sourceAccountNumber;
+    private String destinationAccountNumber;
     private BigDecimal amount;
     private String description;
+    private String transactionRef;
 }

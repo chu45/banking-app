@@ -35,27 +35,32 @@ public class TransactionController {
         }
     }
 
-    @PostMapping("/deposit/{accountId}")
-    public TransactionDto deposit(@RequestBody TransactionRequest request, @PathVariable Long accountId, HttpServletRequest httpRequest) {
+    @PostMapping("/deposit/{accountNumber}")
+    public TransactionDto deposit(@RequestBody TransactionRequest request, @PathVariable String accountNumber, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromToken(httpRequest);
-        return transactionService.deposit(accountId, request, userId);
+        return transactionService.deposit(accountNumber, request, userId);
     }
 
-    @PostMapping("/withdraw/{accountId}")
-    public TransactionDto withdraw(@RequestBody TransactionRequest request, @PathVariable Long accountId, HttpServletRequest httpRequest) {
+    @PostMapping("/withdraw/{accountNumber}")
+    public TransactionDto withdraw(@RequestBody TransactionRequest request, @PathVariable String accountNumber, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromToken(httpRequest);
-        return transactionService.withdraw(accountId, request, userId);
+        return transactionService.withdraw(accountNumber, request, userId);
     }
     
-    @PostMapping("/transfer/{sourceAccountId}/to/{destinationAccountId}")
-    public TransactionDto transfer(@RequestBody TransactionRequest request, @PathVariable Long sourceAccountId, @PathVariable Long destinationAccountId, HttpServletRequest httpRequest) {
+    @PostMapping("/transfer/{sourceAccountNumber}/to/{destinationAccountNumber}")
+    public TransactionDto transfer(@RequestBody TransactionRequest request, @PathVariable String sourceAccountNumber, @PathVariable String destinationAccountNumber, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromToken(httpRequest);
-        return transactionService.transfer(sourceAccountId, destinationAccountId, request, userId);
+        return transactionService.transfer(sourceAccountNumber, destinationAccountNumber, request, userId);
     }
 
     @GetMapping("/account/{accountId}")
     public List<TransactionDto> getTransactions(@PathVariable Long accountId, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromToken(httpRequest);
         return transactionService.getTransactions(accountId, userId);
+    }
+    
+    @GetMapping("/ref/{transactionRef}")
+    public TransactionDto getTransactionByRef(@PathVariable String transactionRef) {
+        return transactionService.getTransactionByRef(transactionRef);
     }
 }
