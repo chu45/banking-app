@@ -42,11 +42,20 @@ public class Transaction {
     @Column(name = "description", length = 255)
     private String description;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @NotNull(message = "Transaction status is required")
+    private TransactionStatus status;
+    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     
     public enum TransactionType {
         DEPOSIT, WITHDRAW, TRANSFER
+    }
+    
+    public enum TransactionStatus {
+        PENDING, COMPLETED, FAILED
     }
 }

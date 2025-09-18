@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import com.example.finance.accounts.AccountRepository;
 import com.example.finance.accounts.AccountService;
 import com.example.finance.transactions.Transaction.TransactionType;
+import com.example.finance.transactions.Transaction.TransactionStatus;
 import com.example.finance.accounts.Account;
 import com.example.finance.exceptions.AccountNotFoundException;
 import com.example.finance.exceptions.AccountSuspendedException;
@@ -54,10 +55,25 @@ public class TransactionService {
         // Validate account status
         validateAccountStatus(account);
         
-        account.setBalance(account.getBalance().add(request.getAmount()));
-        accountRepository.save(account);
-        Transaction transaction = new Transaction(null, null, account, TransactionType.DEPOSIT, request.getAmount(), request.getDescription(), null);
-        return transactionMapper.toDto(transactionRepository.save(transaction));
+        // Create transaction with PENDING status first
+        Transaction transaction = new Transaction(null, null, account, TransactionType.DEPOSIT, request.getAmount(), request.getDescription(), TransactionStatus.PENDING, null);
+        Transaction savedTransaction = transactionRepository.save(transaction);
+        
+        try {
+            // Process the deposit
+            account.setBalance(account.getBalance().add(request.getAmount()));
+            accountRepository.save(account);
+            
+            // Update transaction status to COMPLETED
+            savedTransaction.setStatus(TransactionStatus.COMPLETED);
+            savedTransaction = transactionRepository.save(savedTransaction);
+            
+            return transactionMapper.toDto(savedTransaction);
+        } catch (Exception e) {
+            savedTransaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(savedTransaction);
+            throw e; // Re-throw the exception
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -81,10 +97,25 @@ public class TransactionService {
             throw new InsufficientBalanceException("Insufficient balance for withdrawal. Available: " + account.getBalance() + ", Requested: " + request.getAmount());
         }
         
-        account.setBalance(account.getBalance().subtract(request.getAmount()));
-        accountRepository.save(account);
-        Transaction transaction = new Transaction(null, account, null, TransactionType.WITHDRAW, request.getAmount(), request.getDescription(), null);
-        return transactionMapper.toDto(transactionRepository.save(transaction));
+        // Create transaction with PENDING status first
+        Transaction transaction = new Transaction(null, account, null, TransactionType.WITHDRAW, request.getAmount(), request.getDescription(), TransactionStatus.PENDING, null);
+        Transaction savedTransaction = transactionRepository.save(transaction);
+        
+        try {
+            // Process the withdrawal
+            account.setBalance(account.getBalance().subtract(request.getAmount()));
+            accountRepository.save(account);
+            
+            // Update transaction status to COMPLETED
+            savedTransaction.setStatus(TransactionStatus.COMPLETED);
+            savedTransaction = transactionRepository.save(savedTransaction);
+            
+            return transactionMapper.toDto(savedTransaction);
+        } catch (Exception e) {
+            savedTransaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(savedTransaction);
+            throw e; // Re-throw the exception
+        }
     }
 
     @Transactional(
@@ -116,24 +147,34 @@ public class TransactionService {
             throw new InsufficientBalanceException("Insufficient balance for transfer. Available: " + sourceAccount.getBalance() + ", Requested: " + request.getAmount());
         }
         
-        // Perform atomic balance updates
-        BigDecimal sourceNewBalance = sourceAccount.getBalance().subtract(request.getAmount());
-        BigDecimal destinationNewBalance = destinationAccount.getBalance().add(request.getAmount());
-        
-        // Update balances
-        sourceAccount.setBalance(sourceNewBalance);
-        destinationAccount.setBalance(destinationNewBalance);
-        
-        // Save both accounts - if either fails, transaction will rollback
-        accountRepository.save(sourceAccount);
-        accountRepository.save(destinationAccount);
-        
-        // Create transaction record - if this fails, all changes will rollback
+        // Create transaction with PENDING status first
         Transaction transaction = new Transaction(null, sourceAccount, destinationAccount, 
-            TransactionType.TRANSFER, request.getAmount(), request.getDescription(), null);
+            TransactionType.TRANSFER, request.getAmount(), request.getDescription(), TransactionStatus.PENDING, null);
         Transaction savedTransaction = transactionRepository.save(transaction);
         
-        return transactionMapper.toDto(savedTransaction);
+        try {
+            // Perform atomic balance updates
+            BigDecimal sourceNewBalance = sourceAccount.getBalance().subtract(request.getAmount());
+            BigDecimal destinationNewBalance = destinationAccount.getBalance().add(request.getAmount());
+            
+            // Update balances
+            sourceAccount.setBalance(sourceNewBalance);
+            destinationAccount.setBalance(destinationNewBalance);
+            
+            // Save both accounts - if either fails, transaction will rollback
+            accountRepository.save(sourceAccount);
+            accountRepository.save(destinationAccount);
+            
+            // Update transaction status to COMPLETED
+            savedTransaction.setStatus(TransactionStatus.COMPLETED);
+            savedTransaction = transactionRepository.save(savedTransaction);
+            
+            return transactionMapper.toDto(savedTransaction);
+        } catch (Exception e) {
+            savedTransaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(savedTransaction);
+            throw e; // Re-throw the exception
+        }
     }
 
     public List<TransactionDto> getTransactions(Long accountId, Long userId) {
