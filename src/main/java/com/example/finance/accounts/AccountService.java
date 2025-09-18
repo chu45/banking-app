@@ -2,11 +2,10 @@ package com.example.finance.accounts;
 
 import org.springframework.stereotype.Service;
 
-import com.example.finance.accounts.AccountDto;
-import com.example.finance.accounts.AccountRequest;
 import com.example.finance.users.User;
-import com.example.finance.accounts.AccountRepository;
 import com.example.finance.users.UserRepository;
+import com.example.finance.exceptions.AccountNotFoundException;
+import com.example.finance.exceptions.UnauthorizedAccountAccessException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,6 +49,41 @@ public class AccountService {
 
     public void deleteAccount(Long accountId) {
         accountRepository.deleteById(accountId);
+    }
+
+    // Method to validate if account belongs to user
+    public void validateAccountOwnership(Long accountId, Long userId) {
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+        if (!account.getUser().getId().equals(userId)) {
+            throw new UnauthorizedAccountAccessException("Access denied: You are not authorized to access this account");
+        }
+    }
+    
+    // Method to suspend an account
+    public AccountDto suspendAccount(Long accountId, Long userId) {
+        validateAccountOwnership(accountId, userId);
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+        account.setAccountStatus(Account.AccountStatus.SUSPENDED);
+        return accountMapper.toDto(accountRepository.save(account));
+    }
+    
+    // Method to activate an account
+    public AccountDto activateAccount(Long accountId, Long userId) {
+        validateAccountOwnership(accountId, userId);
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+        account.setAccountStatus(Account.AccountStatus.ACTIVE);
+        return accountMapper.toDto(accountRepository.save(account));
+    }
+    
+    // Method to get account status
+    public Account.AccountStatus getAccountStatus(Long accountId, Long userId) {
+        validateAccountOwnership(accountId, userId);
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+        return account.getAccountStatus();
     }
     
 }

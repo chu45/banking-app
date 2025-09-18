@@ -2,7 +2,6 @@ package com.example.finance.accounts;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -56,6 +55,24 @@ public class AccountController {
     @DeleteMapping("/{accountId}")
     public void deleteAccount(@PathVariable Long accountId) {
         accountService.deleteAccount(accountId);
+    }
+
+    @PatchMapping("/{accountId}/suspend")
+    public AccountDto suspendAccount(@PathVariable Long accountId, HttpServletRequest request) {
+        Long userId = getUserIdFromToken(request);
+        return accountService.suspendAccount(accountId, userId);
+    }
+
+    @PatchMapping("/{accountId}/activate")
+    public AccountDto activateAccount(@PathVariable Long accountId, HttpServletRequest request) {
+        Long userId = getUserIdFromToken(request);
+        return accountService.activateAccount(accountId, userId);
+    }
+
+    @GetMapping("/{accountId}/status")
+    public Account.AccountStatus getAccountStatus(@PathVariable Long accountId, HttpServletRequest request) {
+        Long userId = getUserIdFromToken(request);
+        return accountService.getAccountStatus(accountId, userId);
     }
 
 }

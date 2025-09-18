@@ -40,11 +40,20 @@ public class Account {
     @Column(name = "balance", precision = 15, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", length = 20)
+    @NotNull(message = "Account status is required")
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     
     public enum AccountType {
         SAVINGS, CURRENT
+    }
+
+    public enum AccountStatus {
+        ACTIVE, SUSPENDED
     }
 }
