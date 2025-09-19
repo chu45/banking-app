@@ -6,6 +6,8 @@ import com.example.finance.users.User;
 import com.example.finance.users.UserRepository;
 import com.example.finance.exceptions.AccountNotFoundException;
 import com.example.finance.exceptions.UnauthorizedAccountAccessException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,9 +39,14 @@ public class AccountService {
             .map(accountMapper::toDto)
             .collect(Collectors.toList());
     }
+    
+    public Page<AccountDto> getUserAccounts(Long userId, Pageable pageable) {
+        return accountRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+            .map(accountMapper::toDto);
+    }
 
-    public AccountDto getAccountById(Long accountId, Long userId) {
-        Account account = accountRepository.findById(accountId).orElseThrow(() -> new RuntimeException("Account not found"));
+    public AccountDto getAccountById(String accountNumber, Long userId) {
+        Account account = accountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new RuntimeException("Account not found"));
         if (!account.getUser().getId().equals(userId)) {
             throw new RuntimeException("Account not found");
         }
@@ -47,42 +54,42 @@ public class AccountService {
     }
 
 
-    public void deleteAccount(Long accountId) {
-        accountRepository.deleteById(accountId);
+        public void deleteAccount(String accountNumber) {
+        accountRepository.deleteByAccountNumber(accountNumber);
     }
 
     // Method to validate if account belongs to user
-    public void validateAccountOwnership(Long accountId, Long userId) {
-        Account account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+    public void validateAccountOwnership(String accountNumber, Long userId) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         if (!account.getUser().getId().equals(userId)) {
             throw new UnauthorizedAccountAccessException("Access denied: You are not authorized to access this account");
         }
     }
     
     // Method to suspend an account
-    public AccountDto suspendAccount(Long accountId, Long userId) {
-        validateAccountOwnership(accountId, userId);
-        Account account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+    public AccountDto suspendAccount(String accountNumber, Long userId) {
+        validateAccountOwnership(accountNumber, userId);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         account.setAccountStatus(Account.AccountStatus.SUSPENDED);
         return accountMapper.toDto(accountRepository.save(account));
     }
     
     // Method to activate an account
-    public AccountDto activateAccount(Long accountId, Long userId) {
-        validateAccountOwnership(accountId, userId);
-        Account account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+    public AccountDto activateAccount(String accountNumber, Long userId) {
+        validateAccountOwnership(accountNumber, userId);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         account.setAccountStatus(Account.AccountStatus.ACTIVE);
         return accountMapper.toDto(accountRepository.save(account));
     }
     
     // Method to get account status
-    public Account.AccountStatus getAccountStatus(Long accountId, Long userId) {
-        validateAccountOwnership(accountId, userId);
-        Account account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+    public Account.AccountStatus getAccountStatus(String accountNumber, Long userId) {
+            validateAccountOwnership(accountNumber, userId);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         return account.getAccountStatus();
     }
     

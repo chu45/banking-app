@@ -14,6 +14,8 @@ import com.example.finance.exceptions.InvalidTransactionAmountException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,12 +28,16 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
     private final AccountService accountService;
+    private final TransactionLimitService transactionLimitService;
     
-    public TransactionService(TransactionRepository transactionRepository, AccountRepository accountRepository, TransactionMapper transactionMapper, AccountService accountService) {
+    public TransactionService(TransactionRepository transactionRepository, AccountRepository accountRepository, 
+                            TransactionMapper transactionMapper, AccountService accountService,
+                            TransactionLimitService transactionLimitService) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.transactionMapper = transactionMapper;
         this.accountService = accountService;
+        this.transactionLimitService = transactionLimitService;
     }
     
     private void validateAccountStatus(Account account) {
@@ -54,11 +60,15 @@ public class TransactionService {
             .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         
         // Validate account ownership
-        accountService.validateAccountOwnership(account.getId(), userId);
+        accountService.validateAccountOwnership(account.getAccountNumber(), userId);
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidTransactionAmountException("Deposit amount must be positive");
         }
         validateAccountStatus(account);
+        
+        // Validate transaction limits
+        transactionLimitService.validateMaximumTransactionLimits(TransactionType.DEPOSIT, request.getAmount());
+        transactionLimitService.validateDailyLimit(account, TransactionType.DEPOSIT, request.getAmount());
         
         // Create transaction with PENDING status first
         String transactionRef = request.getTransactionRef() != null ? request.getTransactionRef() : generateTransactionRef();
@@ -71,6 +81,9 @@ public class TransactionService {
             accountRepository.save(account);
             savedTransaction.setStatus(TransactionStatus.COMPLETED);
             savedTransaction = transactionRepository.save(savedTransaction);
+            
+            // Record transaction for limit tracking
+            transactionLimitService.recordTransaction(account, TransactionType.DEPOSIT, request.getAmount());
             
             return transactionMapper.toDto(savedTransaction);
         } catch (Exception e) {
@@ -87,7 +100,7 @@ public class TransactionService {
             .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         
         // Validate account ownership
-        accountService.validateAccountOwnership(account.getId(), userId);
+        accountService.validateAccountOwnership(account.getAccountNumber(), userId);
         
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidTransactionAmountException("Withdrawal amount must be positive");
@@ -96,6 +109,10 @@ public class TransactionService {
         if (account.getBalance().compareTo(request.getAmount()) < 0) {
             throw new InsufficientBalanceException("Insufficient balance for withdrawal. Available: " + account.getBalance() + ", Requested: " + request.getAmount());
         }
+        
+        // Validate transaction limits
+        transactionLimitService.validateMaximumTransactionLimits(TransactionType.WITHDRAW, request.getAmount());
+        transactionLimitService.validateDailyLimit(account, TransactionType.WITHDRAW, request.getAmount());
         
         // Create transaction with PENDING status first
         String transactionRef = request.getTransactionRef() != null ? request.getTransactionRef() : generateTransactionRef();
@@ -108,6 +125,9 @@ public class TransactionService {
             accountRepository.save(account);
             savedTransaction.setStatus(TransactionStatus.COMPLETED);
             savedTransaction = transactionRepository.save(savedTransaction);
+            
+            // Record transaction for limit tracking
+            transactionLimitService.recordTransaction(account, TransactionType.WITHDRAW, request.getAmount());
             
             return transactionMapper.toDto(savedTransaction);
         } catch (Exception e) {
@@ -129,7 +149,7 @@ public class TransactionService {
         Account destinationAccount = accountRepository.findByAccountNumber(destinationAccountNumber)
             .orElseThrow(() -> new AccountNotFoundException("Destination account with number " + destinationAccountNumber + " not found"));
         
-        accountService.validateAccountOwnership(sourceAccount.getId(), userId);
+        accountService.validateAccountOwnership(sourceAccount.getAccountNumber(), userId);
         
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidTransactionAmountException("Transfer amount must be positive");
@@ -141,6 +161,10 @@ public class TransactionService {
         if (sourceAccount.getBalance().compareTo(request.getAmount()) < 0) {
             throw new InsufficientBalanceException("Insufficient balance for transfer. Available: " + sourceAccount.getBalance() + ", Requested: " + request.getAmount());
         }
+        
+        // Validate transaction limits
+        transactionLimitService.validateMaximumTransactionLimits(TransactionType.TRANSFER, request.getAmount());
+        transactionLimitService.validateDailyLimit(sourceAccount, TransactionType.TRANSFER, request.getAmount());
         
         // Create transaction with PENDING status first
         String transactionRef = request.getTransactionRef() != null ? request.getTransactionRef() : generateTransactionRef();
@@ -164,6 +188,9 @@ public class TransactionService {
             savedTransaction.setStatus(TransactionStatus.COMPLETED);
             savedTransaction = transactionRepository.save(savedTransaction);
             
+            // Record transaction for limit tracking
+            transactionLimitService.recordTransaction(sourceAccount, TransactionType.TRANSFER, request.getAmount());
+            
             return transactionMapper.toDto(savedTransaction);
         } catch (Exception e) {
             savedTransaction.setStatus(TransactionStatus.FAILED);
@@ -172,15 +199,26 @@ public class TransactionService {
         }
     }
 
-    public List<TransactionDto> getTransactions(Long accountId, Long userId) {
+    public List<TransactionDto> getTransactions(String accountNumber, Long userId) {
         // Validate account ownership
-        accountService.validateAccountOwnership(accountId, userId);
+        accountService.validateAccountOwnership(accountNumber, userId);
         
-        Account account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new AccountNotFoundException("Account with ID " + accountId + " not found"));
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
         return transactionRepository.findBySourceAccountOrDestinationAccount(account, account).stream().map(transactionMapper::toDto).collect(Collectors.toList());
     }
     
+    public Page<TransactionDto> getTransactionsPaginated(String accountNumber, Long userId, Pageable pageable) {
+        // Validate account ownership
+        accountService.validateAccountOwnership(accountNumber, userId);
+        
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException("Account with number " + accountNumber + " not found"));
+            
+        Page<Transaction> transactionPage = transactionRepository.findBySourceAccountOrDestinationAccount(account, account, pageable);
+        return transactionPage.map(transactionMapper::toDto);
+    }
+        
     public TransactionDto getTransactionByRef(String transactionRef) {
         Transaction transaction = transactionRepository.findByTransactionRef(transactionRef)
             .orElseThrow(() -> new RuntimeException("Transaction with reference " + transactionRef + " not found"));

@@ -8,6 +8,11 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import java.util.List;
 import com.example.finance.auth.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,34 +50,51 @@ public class AccountController {
         Long userId = getUserIdFromToken(request);
         return accountService.getUserAccounts(userId);
     }
+    
+    @GetMapping("/paginated")
+    public Page<AccountDto> getUserAccountsPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            HttpServletRequest request) {
+        Long userId = getUserIdFromToken(request);
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") 
+            ? Sort.by(sortBy).descending() 
+            : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        
+        return accountService.getUserAccounts(userId, pageable);
+    }
 
-    @GetMapping("/{accountId}")
-    public AccountDto getAccountById(@PathVariable Long accountId, HttpServletRequest httpRequest) {
+    @GetMapping("/{accountNumber}")
+    public AccountDto getAccountById(@PathVariable String accountNumber, HttpServletRequest httpRequest) {
         Long userId = getUserIdFromToken(httpRequest);
-        return accountService.getAccountById(accountId, userId);
+        return accountService.getAccountById(accountNumber, userId);
     }
 
-    @DeleteMapping("/{accountId}")
-    public void deleteAccount(@PathVariable Long accountId) {
-        accountService.deleteAccount(accountId);
+    @DeleteMapping("/{accountNumber}")
+    public void deleteAccount(@PathVariable String accountNumber) {
+        accountService.deleteAccount(accountNumber);
     }
 
-    @PatchMapping("/{accountId}/suspend")
-    public AccountDto suspendAccount(@PathVariable Long accountId, HttpServletRequest request) {
+    @PatchMapping("/{accountNumber}/suspend")
+    public AccountDto suspendAccount(@PathVariable String accountNumber, HttpServletRequest request) {
         Long userId = getUserIdFromToken(request);
-        return accountService.suspendAccount(accountId, userId);
+        return accountService.suspendAccount(accountNumber, userId);
     }
 
-    @PatchMapping("/{accountId}/activate")
-    public AccountDto activateAccount(@PathVariable Long accountId, HttpServletRequest request) {
+    @PatchMapping("/{accountNumber}/activate")
+    public AccountDto activateAccount(@PathVariable String accountNumber, HttpServletRequest request) {
         Long userId = getUserIdFromToken(request);
-        return accountService.activateAccount(accountId, userId);
+        return accountService.activateAccount(accountNumber, userId);
     }
 
-    @GetMapping("/{accountId}/status")
-    public Account.AccountStatus getAccountStatus(@PathVariable Long accountId, HttpServletRequest request) {
+    @GetMapping("/{accountNumber}/status")
+        public Account.AccountStatus getAccountStatus(@PathVariable String accountNumber, HttpServletRequest request) {
         Long userId = getUserIdFromToken(request);
-        return accountService.getAccountStatus(accountId, userId);
+        return accountService.getAccountStatus(accountNumber, userId);
     }
 
 }

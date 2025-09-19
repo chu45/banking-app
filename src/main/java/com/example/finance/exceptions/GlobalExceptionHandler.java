@@ -30,4 +30,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
     }
     
+    @ExceptionHandler(DailyLimitExceededException.class)
+    public ResponseEntity<?> handleDailyLimitExceededException(DailyLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+    
+    @ExceptionHandler(MaximumTransferLimitExceededException.class)
+    public ResponseEntity<?> handleMaximumTransferLimitExceededException(MaximumTransferLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+    
 }

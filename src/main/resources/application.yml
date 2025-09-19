@@ -18,3 +18,15 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
+
+# Finance Application Configuration
+finance:
+  transaction:
+    # Maximum transaction limits (system-wide)
+    max-transfer-limit: 1000000.00
+    max-deposit-limit: 500000.00
+    max-withdraw-limit: 100000.00
+    
+    # Default daily limits (per account, per transaction type)
+    default-daily-limit: 50000.00
+    default-daily-transaction-count: 50
